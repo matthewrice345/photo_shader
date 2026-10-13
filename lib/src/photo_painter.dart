@@ -3,16 +3,36 @@ import 'dart:ui' as ui;
 
 import 'package:photo_shader/src/models/photo_style.dart';
 
+/// Encodes [BoxFit] for [PhotoPainter] / fragment shader [uFitMode].
+double boxFitUniformValue(BoxFit fit) {
+  switch (fit) {
+    case BoxFit.fill:
+    case BoxFit.none:
+      return 4;
+    case BoxFit.contain:
+    case BoxFit.scaleDown:
+      return 0;
+    case BoxFit.cover:
+      return 1;
+    case BoxFit.fitWidth:
+      return 2;
+    case BoxFit.fitHeight:
+      return 3;
+  }
+}
+
 class PhotoPainter extends CustomPainter {
   const PhotoPainter({
     required this.shader,
     required this.image,
     required this.style,
+    this.fit = BoxFit.contain,
   });
 
   final ui.FragmentShader shader;
   final ui.Image image;
   final PhotoStyle style;
+  final BoxFit fit;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -45,6 +65,9 @@ class PhotoPainter extends CustomPainter {
     shader.setFloat(23, style.colorBalance.g);
     shader.setFloat(24, style.colorBalance.b);
 
+    shader.setFloat(25, image.width.toDouble());
+    shader.setFloat(26, image.height.toDouble());
+    shader.setFloat(27, boxFitUniformValue(fit));
 
     final paint = Paint()..shader = shader;
 
@@ -56,6 +79,6 @@ class PhotoPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PhotoPainter oldDelegate) {
-    return style != oldDelegate.style || image != oldDelegate.image;
+    return style != oldDelegate.style || image != oldDelegate.image || fit != oldDelegate.fit;
   }
 }

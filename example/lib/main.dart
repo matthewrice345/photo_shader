@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:photo_shader/photo_shader.dart';
+import 'package:photo_shader_example/use_cases/image_case.dart';
+import 'package:photo_shader_example/use_cases/pixelation_case.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,73 +13,53 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        body: Container(
-          color: Colors.grey.shade100,
-          child: RebuildingShaderExample(),
+        body: SafeArea(
+          child: Container(
+            padding: EdgeInsets.all(24),
+            color: Colors.grey.shade100,
+            child: ShaderPickerPage(),
+          ),
         ),
       ),
     );
   }
 }
 
-class RebuildingShaderExample extends StatefulWidget {
-  const RebuildingShaderExample({super.key});
-
-  @override
-  State<RebuildingShaderExample> createState() => _RebuildingShaderExampleState();
-}
-
-class _RebuildingShaderExampleState extends State<RebuildingShaderExample> {
-
-  PhotoStyle imageStyle = PhotoStyle.noEffects();
-
-  AssetImage image = AssetImage('assets/images/test_image.jpg');
-
-  void setHue(double value) {
-    setState(() {
-      imageStyle = imageStyle.copyWith(hue: value);
-    });
-  }
+class ShaderPickerPage extends StatelessWidget {
+  const ShaderPickerPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Wrap(
+      runSpacing: 16,
+      spacing: 16,
       children: [
-        Expanded(
-          child: Center(
-            child: PhotoShader.provider(
-              style: imageStyle,
-              imageProvider: image,
-            ),
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ImageiOSCase()));
+          },
+          child: Container(
+            color: Colors.grey.shade300,
+            height: 100, width: 100,
+            alignment: Alignment.center,
+            child: Text('iOS'),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(onPressed: () {
-                if(imageStyle.hue == 1) {
-                  setHue(0.5);
-                } else {
-                  setHue(1);
-                }
-              }, child: Text('Rebuild Shader')),
-              ElevatedButton(onPressed: () {
-                if(image.assetName == 'assets/images/test_image.jpg') {
-                  setState(() {
-                    image = AssetImage('assets/images/test_image_2.jpg');
-                  });
-                } else {
-                  setState(() {
-                    image = AssetImage('assets/images/test_image.jpg');
-                  });
-                }
-              }, child: Text('Change Image')),
-            ],
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ImageCase()));
+          },
+          child: Container(
+            color: Colors.grey.shade300,
+            height: 100, width: 100,
+            alignment: Alignment.center,
+            child: Text('Image'),
           ),
         ),
       ],
     );
   }
 }
+
+
+

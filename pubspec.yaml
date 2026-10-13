@@ -21,4 +21,5 @@ dev_dependencies:
 
 flutter:
   shaders:
+    - assets/shaders/simple_photo_shader.frag
     - assets/shaders/photo_shader.frag

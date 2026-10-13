@@ -27,8 +27,55 @@ uniform float u_vignette;               // Vignette adjustment
 uniform float u_sepia;                  // Sepia adjustment
 uniform float u_grayscale;              // Grayscale adjustment
 uniform vec3  u_colorBalance;           // Color Balance adjustment
+uniform vec2  uImageSize;               // Bitmap size in pixels (width, height)
+uniform float uFitMode;                 // 0 contain, 1 cover, 2 fitWidth, 3 fitHeight, 4 fill (stretch)
 
 out vec4 fragColor;                     // Output color
+
+/// Maps fragment position to texture UV for Flutter [BoxFit] (see Dart _boxFitUniform).
+vec2 boxFitTexUv(vec2 fc, vec2 canvas, vec2 img, float mode) {
+    float cw = canvas.x;
+    float ch = canvas.y;
+    float iw = max(img.x, 1.0);
+    float ih = max(img.y, 1.0);
+
+    // 4 = fill — legacy stretch to full widget
+    if (mode > 3.5) {
+        return vec2(fc.x / cw, fc.y / ch);
+    }
+
+    // 0 = contain (+ fitInside / scaleDown approximated in Dart)
+    if (mode < 0.5) {
+        float scale = min(cw / iw, ch / ih);
+        float wDisp = iw * scale;
+        float hDisp = ih * scale;
+        vec2 off = vec2(cw - wDisp, ch - hDisp) * 0.5;
+        return vec2((fc.x - off.x) / wDisp, (fc.y - off.y) / hDisp);
+    }
+
+    // 1 = cover
+    if (mode < 1.5) {
+        float scale = max(cw / iw, ch / ih);
+        float wDisp = iw * scale;
+        float hDisp = ih * scale;
+        vec2 off = vec2(cw - wDisp, ch - hDisp) * 0.5;
+        return vec2((fc.x - off.x) / wDisp, (fc.y - off.y) / hDisp);
+    }
+
+    // 2 = fitWidth
+    if (mode < 2.5) {
+        float scale = cw / iw;
+        float hDisp = ih * scale;
+        float yOff = (ch - hDisp) * 0.5;
+        return vec2(fc.x / cw, (fc.y - yOff) / hDisp);
+    }
+
+    // 3 = fitHeight
+    float scale = ch / ih;
+    float wDisp = iw * scale;
+    float xOff = (cw - wDisp) * 0.5;
+    return vec2((fc.x - xOff) / wDisp, fc.y / ch);
+}
 
 vec3 rgb2hsv(vec3 c) {
     vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -49,10 +96,16 @@ vec3 hsv2rgb(vec3 c) {
 void main() {
     vec2 iResolution = uSize;
     vec2 fragCoord = FlutterFragCoord();
-    vec2 uv = fragCoord/iResolution.xy;
+    vec2 uvCanvas = fragCoord / iResolution.xy;
+    vec2 texUv = boxFitTexUv(fragCoord, iResolution.xy, uImageSize, uFitMode);
+
+    if (texUv.x < 0.0 || texUv.x > 1.0 || texUv.y < 0.0 || texUv.y > 1.0) {
+        fragColor = vec4(0.0);
+        return;
+    }
 
     // Sample the pixel color
-    vec4 color = texture(u_image, uv);
+    vec4 color = texture(u_image, texUv);
 
     // 1. Apply Brightness
     if (u_brightness != 0.0) {
@@ -136,12 +189,13 @@ void main() {
         color.rgb += vec3(u_tint, -u_tint, 0.0);
     }
 
-    // 16. Apply Sharpening
+    // 16. Apply Sharpening (offsets in texture space ~1px when possible)
     if (u_sharpen != 0.0) {
-        vec4 sharpenedColor = texture(u_image, uv + vec2(0.001, 0.0)) +
-        texture(u_image, uv + vec2(-0.001, 0.0)) +
-        texture(u_image, uv + vec2(0.0, 0.001)) +
-        texture(u_image, uv + vec2(0.0, -0.001)) -
+        vec2 d = vec2(1.0 / max(uImageSize.x, 1.0), 1.0 / max(uImageSize.y, 1.0));
+        vec4 sharpenedColor = texture(u_image, texUv + vec2(d.x, 0.0)) +
+        texture(u_image, texUv + vec2(-d.x, 0.0)) +
+        texture(u_image, texUv + vec2(0.0, d.y)) +
+        texture(u_image, texUv + vec2(0.0, -d.y)) -
         4.0 * color;
         color.rgb += sharpenedColor.rgb * u_sharpen;
     }
@@ -151,9 +205,9 @@ void main() {
         color.rgb = mix(color.rgb, vec3(0.5), u_noiseReduction);
     }
 
-    // 18. Apply Vignette
+    // 18. Apply Vignette (screen space, not texture space)
     if (u_vignette != 0.0) {
-        float dist = distance(uv, vec2(0.5, 0.5));
+        float dist = distance(uvCanvas, vec2(0.5, 0.5));
         color.rgb *= smoothstep(0.8, 0.5, dist * u_vignette);
     }
 
